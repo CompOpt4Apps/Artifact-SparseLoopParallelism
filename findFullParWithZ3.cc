@@ -64,9 +64,13 @@ string int2str(int i);
 string trimO(string str);
 string b2s(bool cond){ if(cond){ return string("Yes");} return string("No");} 
 void genChillScript(json &analysisInfo);
-std::vector<std::string> getUQR(int r_it, std::set<std::string> UFSyms);
+std::vector<std::string> getUQR(int r_it, std::set<std::string> &UFSyms, 
+                                std::set<std::string> &VarSyms);
 // Decide a dependence relation with z3
-bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> constrantsAndDefs, 
+bool decideWithZ3(json &z3Info, Relation *dep, int id,
+                  std::set<std::string> glVarSyms,
+                  std::set<std::string> UFSyms,
+                  std::vector<std::string> constrants, 
                   std::vector<std::string> properties);
 void readLoop(string str, int &stNo, int &parLL, int &nRels);
 
@@ -151,10 +155,8 @@ void driver(string list)
     
     // Extract the loop ID, and number of extracted relations for it from CHILL output file
     readLoop(line, stNo, parLL, nRels);
-    //cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n";
 
-
-cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n";
+cout<<"\n\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n\n";
 
     i=0;
     for (ct=0; ct < nRels ; ct++){
@@ -184,20 +186,30 @@ cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<
 
     json z3Info = data[0][0]["z3 info"];
 
+    z3_f_c = 0;
     // Use different form of domain information
 int r_it = FuncConsistency ;    //for(int r_it = 0 ; r_it <= FuncConsistency ; r_it++ ){
       
       for( i=0; i < nUniqueRels; i++){    //Loop over all unique relations
-
-std::cout<<"\n\n\n>>>>> RELATION "<<i<<"\n";
-
         std::set<std::string> UFSyms;
-        std::vector<std::string> constrantsAndDefs = dependences[i].rel->getZ3form(UFSyms);
+        std::set<std::string> VarSyms;
+        std::vector<std::string> constrants = 
+               dependences[i].rel->getZ3form(UFSyms, VarSyms);
+
+//cout<<"\n\n\n>>>>> RELATION "<<i<<"\n";
+//for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
+//std::cout<<"    Seen UFS = "<<*it<<"\n";
+//}
+//for(std::set<std::string>::iterator it=VarSyms.begin(); it != VarSyms.end(); it++){
+//std::cout<<"    Seen VarSym = "<<*it<<"\n";
+//}
+
+        // Get z3 form of relevant universially quantified assertions
+        std::vector<std::string> properties = getUQR(r_it, UFSyms, VarSyms);
+
         // Decide a dependence relation with z3
-
-        std::vector<std::string> properties = getUQR(r_it, UFSyms);
-
-        decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), constrantsAndDefs, properties);
+        decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), 
+                     VarSyms, UFSyms, constrants, properties);
       }
 /* 
     if(unSatFound == nUniqueRels){
@@ -222,37 +234,76 @@ void readLoop(string str, int &stNo, int &parLL, int &nRels){
 }
 
 // Decide a dependence relation with z3
-bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> constrantsAndDefs, 
+bool decideWithZ3(json &z3Info, Relation *dep, int id,
+                  std::set<std::string> glVarSyms,
+                  std::set<std::string> UFSyms,
+                  std::vector<std::string> constrants, 
                   std::vector<std::string> properties){
-  bool sat = true;
-  string n_outF = z3Info[0]["Path"].as<string>() + int2str(id) + ".smt2";
-  ofstream outf;
-  outf.open( n_outF.c_str(), std::ofstream::out);
 
-  outf<<"(set-option :timeout "<<z3Info[0]["timeout"].as<string>()<<")\n";
+  // Generate UFSymbol definitions, as well as their domain and range definition
+  std::vector<std::string> UFSymDef;
+  for (std::set<std::string>::iterator it=UFSyms.begin(); it!=UFSyms.end(); it++){
+    int nd = queryDomainArityCurrEnv(*it), nr = queryRangeArityCurrEnv(*it);
+    string z3Str = "(declare-fun " + (*it) + " ( ";
+    for(int i=0; i < nd; i++) z3Str += "Int ";
+    z3Str += ")";
+    for(int i=0; i < nr; i++) z3Str += " Int";
+    z3Str += ") ";
+    UFSymDef.push_back(z3Str);
+    // Creating assertion for Domain and Range of the UF Symbol
+    // We are gonna make a universially quantified rule out of 
+    // Domain and range, and get its z3 form 
+    UniQuantRule *uqRule = getUQRForFuncDomainRange(*it);
+    std::set<std::string> relUFSs; relUFSs.insert(*it);
+    string drZ3Str = uqRule->getZ3Form(relUFSs, glVarSyms);
+    UFSymDef.push_back(drZ3Str);
+    delete uqRule;
+  }
+  // Add any user defined extra symbolic constant definition
   json jExtraSyms = z3Info[0]["Extra Symbols"];
   for(int i=0; i < jExtraSyms.size() ; i++ ){
-     outf<<string("(declare-const "+ jExtraSyms[i].as<string>() + " Int)")<<"\n";
+     glVarSyms.insert(jExtraSyms[i].as<string>());
   }
-  for(int i = 0 ; i < constrantsAndDefs.size(); i++)
-    outf<<constrantsAndDefs[i]<<"\n";
 
+  // Generate the z3 input file for a dependence relation
+  bool sat = true;
+  string n_outF = z3Info[0]["Path"].as<string>() + "_" +int2str(id) + ".smt2";
+  ofstream outf;
+  outf.open( n_outF.c_str(), std::ofstream::out);
+  // Time out definition 
+  outf<<"(set-option :timeout "<<z3Info[0]["timeout"].as<string>()<<")\n";
+  // Defining Global variables (symbolic constants)
+  outf<<"\n\n; Defining Global variables:\n\n";
+  for (std::set<std::string>::iterator it=glVarSyms.begin(); it!=glVarSyms.end(); it++)
+    outf<<("(declare-const "+ *it + " Int)")<<"\n";
+  // Defining UFSymbols, and their domain and range 
+  outf<<"\n\n;  Defining UFSymbols, and their domain and range :\n\n";
+  for(int i = 0 ; i < UFSymDef.size(); i++)
+    outf<<UFSymDef[i]<<"\n";
+  // Defining the constraints in the dependence relation (and tuple variables)
+  outf<<"\n\n; Defining the constraints in the dependence relation (and tuple variables):\n\n";
+  outf<<"; Dependence (IEGenLib Relation) = "<<dep->getString()<<"\n\n";
+  for(int i = 0 ; i < constrants.size(); i++)
+    outf<<constrants[i]<<"\n";
+  // Defining universially quantified assertions 
+  // relevant to UFCalls found in the dependence
+  outf<<"\n\n; Defining universially quantified assertions "
+               "relevant to UFCalls found in the dependence:\n\n";
   for(int i = 0 ; i < properties.size(); i++)
     outf<<properties[i]<<"\n";
 
-  outf<<"\n(check-sat)\n";
-
+  outf<<"\n\n(check-sat)\n";
   outf.close();
 
 cout<<"\nwrote "<<n_outF<<"\n";
 
-  //
+  // Running z3 
   string ans;
   string z3Command = "./z3/build/z3 " + n_outF + "> data/tempData/z3ansF.txt" + " 2> /dev/null"; 
   int z3Err = system (z3Command.c_str());
   ifstream z3ansF("data/tempData/z3ansF.txt", std::ofstream::in);
   getline(z3ansF, ans);
-  cout<<"\n"<<ans;
+cout<<ans<<"\n";
   z3ansF.close();
 
   if(ans == "unsat") sat = false;
@@ -263,7 +314,8 @@ cout<<"\nwrote "<<n_outF<<"\n";
 
 
 
-std::vector<std::string> getUQR(int r_it, std::set<std::string> UFSyms){
+std::vector<std::string> getUQR(int r_it, std::set<std::string> &UFSyms, 
+                                std::set<std::string> &VarSyms){
 
   bool useRule[10]={0};
   if( r_it == FuncConsistency){// FuncConsistency signals we want to use all the rules
@@ -275,20 +327,22 @@ std::vector<std::string> getUQR(int r_it, std::set<std::string> UFSyms){
   std::vector<std::string> uqrs;
   UniQuantRule* uqRule;
   int noAvalRules = queryNoUniQuantRules();
+
 //cout<<"\nNo. of UQRs = "<<noAvalRules<<"\n";
+
   for(int i = 0 ; i < noAvalRules ; i++ ){
 
-std::cout<<"\n>> RN "<<i<<"\n";
-for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
-std::cout<<"    Re UFS = "<<*it<<"\n";
-}
+//std::cout<<"\n>> RuleNum "<<i<<"\n";
+//for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
+//std::cout<<"    Re UFS = "<<*it<<"\n";
+//}
 
     // Query rule No. i from environment
     uqRule = queryUniQuantRuleEnv(i);
     // If we do not want to instantiate this rule move on to next one
     if( !(useRule[uqRule->getType()]) ) continue;
 
-    string z3Str = uqRule->getZ3Form(UFSyms);
+    string z3Str = uqRule->getZ3Form(UFSyms, VarSyms);
     if( z3Str != "" ) uqrs.push_back(z3Str);
   }
 
