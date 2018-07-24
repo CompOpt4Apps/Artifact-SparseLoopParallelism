@@ -64,6 +64,7 @@ string int2str(int i);
 string trimO(string str);
 string b2s(bool cond){ if(cond){ return string("Yes");} return string("No");} 
 void genChillScript(json &analysisInfo);
+std::vector<std::string> getUQR(int r_it, std::set<std::string> UFSyms);
 // Decide a dependence relation with z3
 bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> constrantsAndDefs, 
                   std::vector<std::string> properties);
@@ -150,15 +151,13 @@ void driver(string list)
     
     // Extract the loop ID, and number of extracted relations for it from CHILL output file
     readLoop(line, stNo, parLL, nRels);
+    //cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n";
 
 
-    // Specify loops that are going to be parallelized, 
-    // so we are not going to project them out.
-//cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n";
+cout<<"\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n";
 
     i=0;
     for (ct=0; ct < nRels ; ct++){
-//cout<<"\nReading r#"<<ct;
       // Read a dependence 
       getline( depf, line);
 
@@ -178,29 +177,28 @@ void driver(string list)
       // Otherwise store it for analysis
       dependences[i].rel = rel;
       i++;
-//cout<<"\nParsed r#"<<ct;
     }
     nUniqueRels = i;
     unSatFound = 0;
     maySatFound = 0;
 
-    std::vector<std::string> properties;
     json z3Info = data[0][0]["z3 info"];
 
-    std::vector<std::string> extraSyms; extraSyms.clear();
-    for( i=0; i < nUniqueRels; i++){    //Loop over all unique relations
-//cout<<"\nCalling z3form for uqRel no: "<<i<<"\n";
-
-      std::vector<std::string> UFSyms;
-
-      std::vector<std::string> constrantsAndDefs = dependences[i].rel->getZ3form(UFSyms);
-      // Decide a dependence relation with z3
-      int noAvalRules = queryNoUniQuantRules();
-      cout<<"\nNo. of UQRs = "<<noAvalRules<<"\n";
+    // Use different form of domain information
+int r_it = FuncConsistency ;    //for(int r_it = 0 ; r_it <= FuncConsistency ; r_it++ ){
       
+      for( i=0; i < nUniqueRels; i++){    //Loop over all unique relations
 
-      decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), constrantsAndDefs, properties);
-    }
+std::cout<<"\n\n\n>>>>> RELATION "<<i<<"\n";
+
+        std::set<std::string> UFSyms;
+        std::vector<std::string> constrantsAndDefs = dependences[i].rel->getZ3form(UFSyms);
+        // Decide a dependence relation with z3
+
+        std::vector<std::string> properties = getUQR(r_it, UFSyms);
+
+        decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), constrantsAndDefs, properties);
+      }
 /* 
     if(unSatFound == nUniqueRels){
      // cout<<"\n\n-------- Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is Fully parallel!\n";
@@ -208,6 +206,7 @@ void driver(string list)
      // cout<<"\n\n-------- Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!\n";
     }
 */
+  //  }
   }
 
  } // End of input json file list loop
@@ -218,31 +217,9 @@ void driver(string list)
 
 
 
-
-
-
 void readLoop(string str, int &stNo, int &parLL, int &nRels){
   sscanf (str.c_str(),"[First stmt = %d, Loop level = %d, No. of Rels = %d]",&stNo,&parLL,&nRels);
 }
-
-
-// Generate CHILL scripts using analysis info from json file 
-void genChillScript(json &analysisInfo){
-
-  ofstream outf;
-  outf.open((analysisInfo[0]["Script file"].as<string>()).c_str(), std::ofstream::out);
-
-  outf<<"from chill import *\n";
-  outf<<"source(\'"<<analysisInfo[0]["Source"].as<string>()<<"\')\n";
-  outf<<"destination(\'"<<analysisInfo[0]["Destination"].as<string>()<<"\')\n";
-  outf<<"procedure(\'"<<analysisInfo[0]["Procedure"].as<string>()<<"\')\n";
-  outf<<"loop("<<analysisInfo[0]["Loop"].as<string>()<<")\n";
-  outf<<"print_dep_ufs(\'"<<analysisInfo[0]["Output file"].as<string>()
-                   <<"\',\'"<<analysisInfo[0]["Private Arrays"].as<string>()
-                   <<"\',\'"<<analysisInfo[0]["Reduction Statements"].as<string>()
-                          <<"\')\n";
-}
-
 
 // Decide a dependence relation with z3
 bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> constrantsAndDefs, 
@@ -267,6 +244,8 @@ bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> 
 
   outf.close();
 
+cout<<"\nwrote "<<n_outF<<"\n";
+
   //
   string ans;
   string z3Command = "./z3/build/z3 " + n_outF + "> data/tempData/z3ansF.txt" + " 2> /dev/null"; 
@@ -279,6 +258,63 @@ bool decideWithZ3(json &z3Info, Relation *dep, int id, std::vector<std::string> 
   if(ans == "unsat") sat = false;
 
   return sat;
+}
+
+
+
+
+std::vector<std::string> getUQR(int r_it, std::set<std::string> UFSyms){
+
+  bool useRule[10]={0};
+  if( r_it == FuncConsistency){// FuncConsistency signals we want to use all the rules
+    for(int j = 0 ; j < TheOthers ; j++ ) useRule[j] = true;
+  } else {
+    useRule[r_it] = 1; 
+  }
+
+  std::vector<std::string> uqrs;
+  UniQuantRule* uqRule;
+  int noAvalRules = queryNoUniQuantRules();
+//cout<<"\nNo. of UQRs = "<<noAvalRules<<"\n";
+  for(int i = 0 ; i < noAvalRules ; i++ ){
+
+std::cout<<"\n>> RN "<<i<<"\n";
+for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
+std::cout<<"    Re UFS = "<<*it<<"\n";
+}
+
+    // Query rule No. i from environment
+    uqRule = queryUniQuantRuleEnv(i);
+    // If we do not want to instantiate this rule move on to next one
+    if( !(useRule[uqRule->getType()]) ) continue;
+
+    string z3Str = uqRule->getZ3Form(UFSyms);
+    if( z3Str != "" ) uqrs.push_back(z3Str);
+  }
+
+  return uqrs;
+}
+
+
+
+
+
+
+// Generate CHILL scripts using analysis info from json file 
+void genChillScript(json &analysisInfo){
+
+  ofstream outf;
+  outf.open((analysisInfo[0]["Script file"].as<string>()).c_str(), std::ofstream::out);
+
+  outf<<"from chill import *\n";
+  outf<<"source(\'"<<analysisInfo[0]["Source"].as<string>()<<"\')\n";
+  outf<<"destination(\'"<<analysisInfo[0]["Destination"].as<string>()<<"\')\n";
+  outf<<"procedure(\'"<<analysisInfo[0]["Procedure"].as<string>()<<"\')\n";
+  outf<<"loop("<<analysisInfo[0]["Loop"].as<string>()<<")\n";
+  outf<<"print_dep_ufs(\'"<<analysisInfo[0]["Output file"].as<string>()
+                   <<"\',\'"<<analysisInfo[0]["Private Arrays"].as<string>()
+                   <<"\',\'"<<analysisInfo[0]["Reduction Statements"].as<string>()
+                          <<"\')\n";
 }
 
 
