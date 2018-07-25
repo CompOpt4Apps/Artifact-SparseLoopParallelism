@@ -27,11 +27,12 @@ using jsoncons::json;
 using namespace iegenlib;
 using namespace std;
 
+  bool check_useRule[8][10];
 // The data structure that holds evaluation result for a dependence relation
 typedef struct deprel{
 
   deprel(){
-    bl = mono = coMono = tri = combo = false;
+    bl = mono = coMono = tri = dr = combo = false;
     origComplexity = simpComplexity = "";
     rel = NULL; simpRel = NULL;
   }
@@ -42,6 +43,7 @@ typedef struct deprel{
   bool mono;  // Is it MaySat after considering mopnotonicity domain information? 
   bool coMono;
   bool tri;
+  bool dr;
   bool combo;
   string origComplexity;
   string simpComplexity;
@@ -62,16 +64,17 @@ string giveCompWithOrd(int ord);
 int compCompare(string comp1, string comp2);
 string int2str(int i);
 string trimO(string str);
+string propName(int prop);
 string b2s(bool cond){ if(cond){ return string("Yes");} return string("No");} 
 void genChillScript(json &analysisInfo);
 std::vector<std::string> getUQR(int r_it, std::set<std::string> &UFSyms, 
-                                std::set<std::string> &VarSyms);
+                                std::set<std::string> &VarSyms, int &uqa_c);
 // Decide a dependence relation with z3
 bool decideWithZ3(json &z3Info, Relation *dep, int id,
                   std::set<std::string> glVarSyms,
-                  std::set<std::string> UFSyms,
-                  std::vector<std::string> constrants, 
-                  std::vector<std::string> properties);
+                  std::set<std::string> UFSyms, std::vector<std::string> constrants, 
+                  std::vector<std::string> properties, int uqa_c, 
+                  int prop, ofstream &outRes);
 void readLoop(string str, int &stNo, int &parLL, int &nRels);
 
 
@@ -116,7 +119,11 @@ void driver(string list)
   json data;
   in >> data;
 
-  cout<<"\n"<<data[0][0]["Name"]<<":\n\n";
+
+  // Outfile for analysis result for a code.
+  ofstream outRes((data[0][0]["Result"].as<string>()).c_str(), std::ofstream::out);
+  cout<<"\n\n\nProcessing "<<data[0][0]["Name"]<<":";
+  z3_f_c = 0;
 
   string kernelComplexity = data[0][0]["Kernel Complexity"].as<string>();
 
@@ -156,7 +163,7 @@ void driver(string list)
     // Extract the loop ID, and number of extracted relations for it from CHILL output file
     readLoop(line, stNo, parLL, nRels);
 
-cout<<"\n\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n\n";
+outRes<<"\n\n<<<<<<<<>>>>>>>> Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n\n";
 
     i=0;
     for (ct=0; ct < nRels ; ct++){
@@ -168,7 +175,6 @@ cout<<"\n\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRel
       if( missingConstraints.size() > 0 ){
         line = adMissingInductionConstraints(line, missingConstraints);
       }
-    
       // If the relation is not unique, ignore it
       rel = new Relation(line); 
       uniqRel = uniqueRelations.insert(*rel);
@@ -186,41 +192,50 @@ cout<<"\n\nDebug: Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRel
 
     json z3Info = data[0][0]["z3 info"];
 
-    z3_f_c = 0;
     // Use different form of domain information
-int r_it = FuncConsistency ;    //for(int r_it = 0 ; r_it <= FuncConsistency ; r_it++ ){
-      
-      for( i=0; i < nUniqueRels; i++){    //Loop over all unique relations
+//int r_it = FuncConsistency ;    
+    for(int r_it = -1 ; r_it <= FuncConsistency ; r_it++ ){
+      outRes<<"\n------ Utilizing property: "<<propName(r_it)<<"\n\n";
+      bool sat = true;
+      int unSatFound=0, maySatFound=0;
+      if(nUniqueRels == 0) sat = false;
+      for( i=0; i < nUniqueRels; i++){  // Loop over all unique relations
+        int uqa_c=1;
         std::set<std::string> UFSyms;
         std::set<std::string> VarSyms;
         std::vector<std::string> constrants = 
                dependences[i].rel->getZ3form(UFSyms, VarSyms);
 
-//cout<<"\n\n\n>>>>> RELATION "<<i<<"\n";
-//for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
-//std::cout<<"    Seen UFS = "<<*it<<"\n";
-//}
-//for(std::set<std::string>::iterator it=VarSyms.begin(); it != VarSyms.end(); it++){
-//std::cout<<"    Seen VarSym = "<<*it<<"\n";
-//}
-
         // Get z3 form of relevant universially quantified assertions
-        std::vector<std::string> properties = getUQR(r_it, UFSyms, VarSyms);
+        std::vector<std::string> properties;
+        if(r_it != -1 && r_it != DomainRange) 
+          properties = getUQR(r_it, UFSyms, VarSyms, uqa_c);
 
         // Decide a dependence relation with z3
-        decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), 
-                     VarSyms, UFSyms, constrants, properties);
+        sat = decideWithZ3(z3Info, dependences[i].rel, (z3_f_c++), 
+                     VarSyms, UFSyms, constrants, properties, uqa_c, r_it, outRes);
+//        if( sat ) break;
+        if( sat ){
+          setDependencesVal(dependences, i, r_it, false);
+          maySatFound++;
+        } else {
+          setDependencesVal(dependences, i, r_it, true);
+          unSatFound++;
+        }
       }
-/* 
-    if(unSatFound == nUniqueRels){
-     // cout<<"\n\n-------- Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is Fully parallel!\n";
-    } else {
-     // cout<<"\n\n-------- Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!\n";
+
+//outRes<<"Number of relations outputed by CHILL = "<<ct<<"\nNumber of Unique relations  = "<<uniqueRelations.size();
+      if( unSatFound == nUniqueRels ){
+        outRes<<"\n\n>>>>>>>> Based on using "<<propName(r_it)<<" :  Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is Fully parallel!\n";
+      } else {
+        outRes<<"\n\n>>>>>>>> Based on using "<<propName(r_it)<<" :  Loop: [StNo = "<<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!\n";
+      }
     }
-*/
-  //  }
   }
 
+  outRes.close(); 
+  cout<<"\n\n\nProcessed "<<data[0][0]["Name"]<<":   Results were written to "
+      <<(data[0][0]["Result"].as<string>()).c_str();
  } // End of input json file list loop
 
 }
@@ -236,10 +251,9 @@ void readLoop(string str, int &stNo, int &parLL, int &nRels){
 // Decide a dependence relation with z3
 bool decideWithZ3(json &z3Info, Relation *dep, int id,
                   std::set<std::string> glVarSyms,
-                  std::set<std::string> UFSyms,
-                  std::vector<std::string> constrants, 
-                  std::vector<std::string> properties){
-
+                  std::set<std::string> UFSyms, std::vector<std::string> constrants, 
+                  std::vector<std::string> properties, int uqa_c, 
+                  int prop, ofstream &outRes){
   // Generate UFSymbol definitions, as well as their domain and range definition
   std::vector<std::string> UFSymDef;
   for (std::set<std::string>::iterator it=UFSyms.begin(); it!=UFSyms.end(); it++){
@@ -253,25 +267,28 @@ bool decideWithZ3(json &z3Info, Relation *dep, int id,
     // Creating assertion for Domain and Range of the UF Symbol
     // We are gonna make a universially quantified rule out of 
     // Domain and range, and get its z3 form 
-    UniQuantRule *uqRule = getUQRForFuncDomainRange(*it);
-    std::set<std::string> relUFSs; relUFSs.insert(*it);
-    string drZ3Str = uqRule->getZ3Form(relUFSs, glVarSyms);
-    UFSymDef.push_back(drZ3Str);
-    delete uqRule;
+    if(prop == DomainRange || prop == FuncConsistency){
+      UniQuantRule *uqRule = getUQRForFuncDomainRange(*it);
+      std::set<std::string> relUFSs; relUFSs.insert(*it);
+      string drZ3Str = uqRule->getZ3Form(relUFSs, glVarSyms, uqa_c++);
+      UFSymDef.push_back(drZ3Str);
+      delete uqRule;
+    }
   }
   // Add any user defined extra symbolic constant definition
   json jExtraSyms = z3Info[0]["Extra Symbols"];
   for(int i=0; i < jExtraSyms.size() ; i++ ){
      glVarSyms.insert(jExtraSyms[i].as<string>());
   }
-
   // Generate the z3 input file for a dependence relation
   bool sat = true;
   string n_outF = z3Info[0]["Path"].as<string>() + "_" +int2str(id) + ".smt2";
   ofstream outf;
   outf.open( n_outF.c_str(), std::ofstream::out);
-  // Time out definition 
+  // Setting up some options
   outf<<"(set-option :timeout "<<z3Info[0]["timeout"].as<string>()<<")\n";
+  outf<<"(set-option :produce-unsat-cores true)\n";
+
   // Defining Global variables (symbolic constants)
   outf<<"\n\n; Defining Global variables:\n\n";
   for (std::set<std::string>::iterator it=glVarSyms.begin(); it!=glVarSyms.end(); it++)
@@ -293,20 +310,26 @@ bool decideWithZ3(json &z3Info, Relation *dep, int id,
     outf<<properties[i]<<"\n";
 
   outf<<"\n\n(check-sat)\n";
+  outf<<"\n\n(get-unsat-core)\n";
   outf.close();
 
-cout<<"\nwrote "<<n_outF<<"\n";
-
   // Running z3 
-  string ans;
+  string ans,unsatcore;
   string z3Command = "./z3/build/z3 " + n_outF + "> data/tempData/z3ansF.txt" + " 2> /dev/null"; 
   int z3Err = system (z3Command.c_str());
   ifstream z3ansF("data/tempData/z3ansF.txt", std::ofstream::in);
   getline(z3ansF, ans);
-cout<<ans<<"\n";
+//cout<<"ans = "<<ans<<"\n";
+  getline(z3ansF, unsatcore);
+//cout<<"UnSat core = "<<unsatcore<<"\n";
   z3ansF.close();
 
   if(ans == "unsat") sat = false;
+
+  
+  outRes<<"\n  Relation = "<<dep->getString()<<"\n     z3 file got written to "<<n_outF<<"\n";
+  if(sat) outRes<<"   "<<ans<<"\n";
+  else    outRes<<"   "<<ans<<"  <>  UnSat core = "<<unsatcore<<"\n";
 
   return sat;
 }
@@ -315,13 +338,13 @@ cout<<ans<<"\n";
 
 
 std::vector<std::string> getUQR(int r_it, std::set<std::string> &UFSyms, 
-                                std::set<std::string> &VarSyms){
+                                std::set<std::string> &VarSyms, int &uqa_c){
 
   bool useRule[10]={0};
   if( r_it == FuncConsistency){// FuncConsistency signals we want to use all the rules
     for(int j = 0 ; j < TheOthers ; j++ ) useRule[j] = true;
   } else {
-    useRule[r_it] = 1; 
+    useRule[r_it] = true; 
   }
 
   std::vector<std::string> uqrs;
@@ -331,18 +354,12 @@ std::vector<std::string> getUQR(int r_it, std::set<std::string> &UFSyms,
 //cout<<"\nNo. of UQRs = "<<noAvalRules<<"\n";
 
   for(int i = 0 ; i < noAvalRules ; i++ ){
-
-//std::cout<<"\n>> RuleNum "<<i<<"\n";
-//for(std::set<std::string>::iterator it=UFSyms.begin(); it != UFSyms.end(); it++){
-//std::cout<<"    Re UFS = "<<*it<<"\n";
-//}
-
     // Query rule No. i from environment
     uqRule = queryUniQuantRuleEnv(i);
     // If we do not want to instantiate this rule move on to next one
     if( !(useRule[uqRule->getType()]) ) continue;
 
-    string z3Str = uqRule->getZ3Form(UFSyms, VarSyms);
+    string z3Str = uqRule->getZ3Form(UFSyms, VarSyms, uqa_c++);
     if( z3Str != "" ) uqrs.push_back(z3Str);
   }
 
@@ -424,7 +441,9 @@ void setDependencesVal(std::vector<depRel> &dependences, int relNo, int rule, bo
   if(rule == Monotonicity)          dependences[relNo].mono = val;
   else if(rule == CoMonotonicity)   dependences[relNo].coMono = val;
   else if(rule == Triangularity)    dependences[relNo].tri = val;
+  else if(rule == DomainRange)    dependences[relNo].dr = val;
   else if(rule == FuncConsistency)  dependences[relNo].combo = val;
+  else if(rule == -1)  dependences[relNo].bl = val;
 }
 
 string getPrettyComplexity(string comp){
@@ -529,3 +548,16 @@ string int2str(int i){
   return string(buf);
 }
 
+
+string propName(int prop){
+  string str;
+
+  if(prop == Monotonicity)          str = "Monotonicity";
+  else if(prop == CoMonotonicity)   str = "Periodic Monotonicity";
+  else if(prop == Triangularity)    str = "Triangularity";
+  else if(prop == DomainRange)      str = "Domain and Range";
+  else if(prop == -1)               str = "Functional Consistency";
+  else if(prop == FuncConsistency)  str = "All properties";
+
+  return str;
+}
