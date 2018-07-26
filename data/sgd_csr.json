@@ -1,0 +1,85 @@
+[
+  [
+    {
+      "Name" : "SGD CSR",
+      "Input Type" : "IEgenLIB Relation",
+      "Index" : "1",
+      "Relation" : "",
+
+      "Efficient Inspector complexity:" : "",
+      "Efficient Inspector complexity after adding domain info:" : "",
+      "Expected" : "",
+
+      "CHILL analysis info" : 
+      [
+        {
+           "Script file" : "data/tempData/sgd_csr.py",
+           "Source" : "data/sgd_csr.c",
+           "Destination" : "data/tempData/sgd_csr_mod.c",
+           "Procedure" : "sgd_csr",
+           "Loop" : "0",
+           "Output file" : "data/tempData/sgd_csr.txt",
+           "Private Arrays" : "",
+           "Reduction Statements" : ""
+        }
+      ],
+
+      "z3 info" : 
+      [
+        {
+           "Path" : "data/tempData/sgd_csr_z3",
+           "timeout" : "2000",
+           "Extra Symbols" : []
+        }
+      ],
+
+      "Result" : "results/sgd_csr",
+
+      "UFS" :
+      [
+        { 
+           "Name" : "rowPtr",
+           "Domain" : "{[it1]:0<=it1 && it1<=n}",
+           "Range" : "{[it1]: 0<=it1 && it1<=nnz}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_Increasing"
+        },
+        { 
+           "Name" : "colIdx",
+           "Domain" : "{[it1]:0<=it1 && it1<=nnz}",
+           "Range" : "{[it1]:0<=it1 && it1<=n}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_NONE"
+        }
+      ],
+      "User Defined" :
+      [
+        {
+          "Type" : "CoMonotonicity",
+          "UniQuantVar" : "[e1,e2,e3]",
+          "Rule (comment)" : "Forall e1,e2,e3  rowPtr(e1) < e2 < rowPtr(e1+1) && rowPtr(e1) < e3 < rowPtr(e1+1) && e2 < e3  => colIdx(e2) != colIdx(e3)",
+          "p" : "rowPtr(e1) <= e2 < rowPtr(e1+1) && rowPtr(e1) <= e3 < rowPtr(e1+1) && e2 < e3",
+          "q" : "colIdx(e2) < colIdx(e3)"
+        }
+      ],
+
+      "Kernel Complexity" : "NaN",
+
+      "Missing induction iterator constraints" :
+      [
+      ],
+      "Do Not Project Out" :
+      [
+        "In_2", "Out_2"
+      ],
+      "Remove Constraints" : "0",
+      "Comment: Code" : [
+                  ""
+                  ],
+      "Comment: Source of data access in the code for this relation" : [
+                    " ",
+                    ""
+                  ]
+    }
+  ]
+]

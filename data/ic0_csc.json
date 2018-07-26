@@ -1,0 +1,76 @@
+[
+  [
+    {
+      "Name" : "Incomplete Cholesky CSR",
+      "CHILL analysis info" : 
+      [
+        {
+           "Script file" : "data/tempData/ic0_csc.py",
+           "Source" : "data/ic0_csc.c",
+           "Destination" : "data/tempData/ic0_csc_mod.c",
+           "Procedure" : "ic0_csc",
+           "Loop" : "0",
+           "Output file" : "data/tempData/ic0_csc.txt",
+           "Private Arrays" : "",
+           "Reduction Statements" : ""
+        }
+      ],
+
+      "z3 info" : 
+      [
+        {
+           "Path" : "data/tempData/ic0_csc_z3",
+           "timeout" : "2000",
+           "Extra Symbols" : []
+        }
+      ],
+
+      "Result" : "results/ic0_csc",
+
+      "UFS" :
+      [
+        { 
+           "Name" : "rowIdx",
+           "Domain" : "{[i]:0<=i && i<nnz}",
+           "Range" : "{[j]: 0<=j && j<n}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_NONE"
+        },
+        { 
+           "Name" : "colPtr",
+           "Domain" : "{[j]:0<=j &&j<n}",
+           "Range" : "{[i]:0<=i &&i<nnz}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_Increasing"
+        }
+      ],
+      "User Defined" :
+      [
+        {
+          "Type" : "Triangularity",
+          "UniQuantVar" : "[e1,e2]",
+          "Rule (comment)" : "Forall e1,e2, colPtr(e1) < e2 => e1 < rowIdx(e2)",
+          "p" : "colPtr(e1) < e2",
+          "q" : "e1 < rowIdx(e2)"
+        },
+        {
+          "Type" : "CoMonotonicity",
+          "UniQuantVar" : "[e1,e2,e3]",
+          "Rule (comment)" : "Forall e1,e2,e3  colPtr(e1) < e2 < colPtr(e1+1) && colPtr(e1) < e3 < colPtr(e1+1) && e2 < e3  => Li(e2) != Li(e3)",
+          "p" : "colPtr(e1) < e2 < colPtr(e1+1) && colPtr(e1) < e3 < colPtr(e1+1) && e2 < e3",
+          "q" : "rowIdx(e2) < rowIdx(e3)"
+        }
+      ],
+
+      "Kernel Complexity" : "O(nnz^3/n^2)",
+
+      "Missing induction iterator constraints" :
+      [
+      ],
+      "Do Not Project Out" :
+      [
+        "In_2", "Out_2"
+      ]
+    }
+  ]
+]

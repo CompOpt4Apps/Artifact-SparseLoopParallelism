@@ -1,0 +1,76 @@
+[
+  [
+    {
+      "Name" : "Forward solve CSC",
+      "CHILL analysis info" : 
+      [
+        {
+           "Script file" : "data/tempData/fs_csc.py",
+           "Source" : "data/fs_csc.c",
+           "Destination" : "data/tempData/fs_csc_mod.c",
+           "Procedure" : "fs_csc",
+           "Loop" : "0",
+           "Output file" : "data/tempData/fs_csc.txt",
+           "Private Arrays" : "",
+           "Reduction Statements" : ""
+        }
+      ],
+
+      "z3 info" : 
+      [
+        {
+           "Path" : "data/tempData/fs_csc_z3",
+           "timeout" : "2000",
+           "Extra Symbols" : []
+        }
+      ],
+
+      "Result" : "results/fs_csc",
+
+      "UFS" :
+      [
+        { 
+           "Name" : "Li",
+           "Domain" : "{[it1]:0<=it1 && it1<=nnz}",
+           "Range" : "{[it1]: 0<=it1 && it1<=n}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_NONE"
+        },
+        { 
+           "Name" : "Lp",
+           "Domain" : "{[it1]:0<=it1 && it1<=n}",
+           "Range" : "{[it1]: 0<=it1 && it1<=nnz}",
+           "Bijective" : "false",
+           "Monotonicity" : "Monotonic_Increasing"
+        }
+      ],
+      "User Defined" :
+      [
+        {
+          "Type" : "Triangularity",
+          "UniQuantVar" : "[e1,e2]",
+          "Rule (comment)" : "Forall e1,e2,  Li(e1) < e2 => e1 < Lp(e2)",
+          "p" : "Lp(e1) < e2",
+          "q" : "e1 < Li(e2)"
+        },
+        {
+          "Type" : "CoMonotonicity",
+          "UniQuantVar" : "[e1,e2,e3]",
+          "Rule (comment)" : "Forall e1,e2,e3  Lp(e1) < e2 < Lp(e1+1) && Lp(e1) < e3 < Lp(e1+1) && e2 < e3  => Li(e2) != Li(e3)",
+          "p" : "Lp(e1) < e2 < Lp(e1+1) && Lp(e1) < e3 < Lp(e1+1) && e2 < e3",
+          "q" : "Li(e2) < Li(e3)"
+        }
+      ],
+
+      "Kernel Complexity" : "O(nnz^1)",
+
+      "Missing induction iterator constraints" :
+      [
+      ],
+      "Do Not Project Out" :
+      [
+        "In_2", "Out_2"
+      ]
+    }
+  ]
+]
