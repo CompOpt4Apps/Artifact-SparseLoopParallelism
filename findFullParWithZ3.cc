@@ -35,14 +35,14 @@ string checkRuleStr[NRL];
 typedef struct deprel{
 
   deprel(){
-    bl = mono = coMono = tri = dr = combo = false;
+    fs = mono = coMono = tri = dr = combo = false;
     origComplexity = simpComplexity = "";
     rel = NULL; simpRel = NULL;
   }
 
   Relation * rel;
   Relation * simpRel;
-  bool bl;    // Is it part of baseline? (is it MaySat considering linear inconsistency?)
+  bool fs;    // Is it UnSat just based on linear inconsistency?
   bool mono;  // Is it MaySat after considering mopnotonicity domain information? 
   bool coMono;
   bool tri;
@@ -210,6 +210,10 @@ void driver(string list)
       if(nUniqueRels == 0) sat = false;
 
       for( i=0; i < nUniqueRels; i++){  // Loop over all unique relations
+
+        // if the dependence is unsat just using functional consistency, do not use index array property
+        if( dependences[i].fs ) continue; 
+
         int uqa_c=1;
         std::set<std::string> UFSyms;
         std::set<std::string> VarSyms;
@@ -225,10 +229,10 @@ void driver(string list)
                      VarSyms, UFSyms, constrants, properties, uqa_c, rlc, outRes);
 
         if( sat ){
-//          setDependencesVal(dependences, i, rlc, false);
+          setDependencesVal(dependences, i, rlc, false);
           maySatFound++;
         } else {
-//          setDependencesVal(dependences, i, rlc, true);
+          setDependencesVal(dependences, i, rlc, true);
           unSatFound++;
         }
       }
@@ -447,14 +451,17 @@ string adMissingInductionConstraints(string str,json &missingConstraints){
   return newStr;
 }
 
-void setDependencesVal(std::vector<depRel> &dependences, int relNo, int rule, bool val){
+void setDependencesVal(std::vector<depRel> &dependences, int relNo, int ruleCombo, bool val){
 
+
+  if(ruleCombo == 0)  dependences[relNo].fs = val;
+/*
   if(rule == Monotonicity)          dependences[relNo].mono = val;
   else if(rule == CoMonotonicity)   dependences[relNo].coMono = val;
   else if(rule == Triangularity)    dependences[relNo].tri = val;
   else if(rule == DomainRange)    dependences[relNo].dr = val;
   else if(rule == FuncConsistency)  dependences[relNo].combo = val;
-  else if(rule == -1)  dependences[relNo].bl = val;
+*/
 }
 
 string getPrettyComplexity(string comp){
@@ -583,7 +590,7 @@ void setCheck_useRule(){
   check_useRule[3][2]=true; //{0,0,1,0,0,0,0,0,0,0,0};
   check_useRule[4][0]=check_useRule[4][1]=true; //{1,1,0,0,0,0,0,0,0,0,0};
   check_useRule[5][0]=check_useRule[5][2]=true; //{1,0,1,0,0,0,0,0,0,0,0};
-  check_useRule[6][1]=check_useRule[6][3]=true; //{0,1,1,0,0,0,0,0,0,0,0};
+  check_useRule[6][1]=check_useRule[6][2]=true; //{0,1,1,0,0,0,0,0,0,0,0};
   check_useRule[7][0]=check_useRule[7][1]=check_useRule[7][2]=true; //{1,1,1,0,0,0,0,0,0,0,0};
   checkRuleStr[0]="[Only Functional Consistency]";
   checkRuleStr[1]="[Monotonicity]";
