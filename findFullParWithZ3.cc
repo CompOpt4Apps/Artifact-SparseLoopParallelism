@@ -36,12 +36,14 @@ typedef struct deprel{
 
   deprel(){
     fs = mono = coMono = tri = dr = combo = false;
+    unsat = 0;
     origComplexity = simpComplexity = "";
     rel = NULL; simpRel = NULL;
   }
 
   Relation * rel;
   Relation * simpRel;
+  int unsat;
   bool fs;    // Is it UnSat just based on linear inconsistency?
   bool mono;  // Is it MaySat after considering mopnotonicity domain information? 
   bool coMono;
@@ -209,10 +211,12 @@ void driver(string list)
       int unSatFound=0, maySatFound=0;
       if(nUniqueRels == 0) sat = false;
 
+      int dc=0;
       for( i=0; i < nUniqueRels; i++){  // Loop over all unique relations
 
         // if the dependence is unsat just using functional consistency, do not use index array property
-        if( dependences[i].fs ) continue; 
+        if( dependences[i].unsat ) continue;   //.fs
+        dc++;
 
         int uqa_c=1;
         std::set<std::string> UFSyms;
@@ -229,15 +233,15 @@ void driver(string list)
                      VarSyms, UFSyms, constrants, properties, uqa_c, rlc, outRes);
 
         if( sat ){
-          setDependencesVal(dependences, i, rlc, false);
+//          setDependencesVal(dependences, i, rlc, false);
           maySatFound++;
         } else {
-          setDependencesVal(dependences, i, rlc, true);
+          setDependencesVal(dependences, i, (rlc+1), true);
           unSatFound++;
         }
       }
 
-      if( unSatFound == nUniqueRels ){
+      if( unSatFound == dc ){
         outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [StNo = "
               <<stNo<<", Level = "<<parLL<<"] is Fully parallel!\n";
       } else {
@@ -453,8 +457,8 @@ string adMissingInductionConstraints(string str,json &missingConstraints){
 
 void setDependencesVal(std::vector<depRel> &dependences, int relNo, int ruleCombo, bool val){
 
-
-  if(ruleCombo == 0)  dependences[relNo].fs = val;
+  dependences[relNo].unsat = ruleCombo; 
+//  if(ruleCombo == 0)  dependences[relNo].fs = val;
 /*
   if(rule == Monotonicity)          dependences[relNo].mono = val;
   else if(rule == CoMonotonicity)   dependences[relNo].coMono = val;
