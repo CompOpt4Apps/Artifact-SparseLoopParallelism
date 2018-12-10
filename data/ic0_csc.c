@@ -7,22 +7,21 @@ extern double sqrt(double in);
 
 void ic0_csc(int n, double *val, int * colPtr, int *rowIdx)
 {
-  int i, k,l,m;
   double temp;
-  for (i = 0; i < n - 1; i++){
+  for (int i = 0; i < n - 1; i++){
     temp = val[colPtr[i]];
     val[colPtr[i]] = val[colPtr[i]]/sqrt(temp);//S1
 
-    for (m = colPtr[i] + 1; m < colPtr[i+1]; m++){
-      val[m] = val[m] / val[colPtr[i]];//S2
+    for (int m1 = colPtr[i] + 1; m1 < colPtr[i+1]; m1++){
+      val[m1] = val[m1] / val[colPtr[i]];//S2
     }
 
-    for (m = colPtr[i] + 1; m < colPtr[i+1]; m++) {
-      for (k = colPtr[rowIdx[m]] ; k < colPtr[rowIdx[m]+1]; k++){
-        for ( l = m; l < colPtr[i+1] ; l++){
+    for (int m2 = colPtr[i] + 1; m2 < colPtr[i+1]; m2++) {
+      for (int k = colPtr[rowIdx[m2]] ; k < colPtr[rowIdx[m2]+1]; k++){
+        for (int l = m2; l < colPtr[i+1] ; l++){
           if (rowIdx[l] == rowIdx[k] ){
             if(rowIdx[l+1] <= rowIdx[k]){
-              val[k] -= val[m]* val[l]; //S3
+              val[k] -= val[m2]* val[l]; //S3
             }
           }
         }

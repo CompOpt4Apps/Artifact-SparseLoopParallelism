@@ -12,11 +12,12 @@ g++ -O3 -o findFullParWithZ3 findFullParWithZ3.cc -I IEGenLib/src IEGenLib/build
 
 >> Run the driver (in root directory):
 
-./simplifyDriver list.txt
+./findFullParWithZ3 list.txt
 
 */
 
 #include <iostream>
+#include <chrono>
 #include "iegenlib.h"
 #include "parser/jsoncons/json.hpp"
 #include<cstdlib>
@@ -107,11 +108,10 @@ int main(int argc, char **argv)
 // The driver that gathers the results for arXiv submission
 void driver(string list)
 {
-  map<string,int> currentCodeOrigComplexities, origComplexities, blComplexities,
-                  monoComplexities, coMonoComplexities, triComplexities, comboComplexities;
-  initComplexities(origComplexities); initComplexities(blComplexities);
-  initComplexities(monoComplexities); initComplexities(coMonoComplexities);
-  initComplexities(triComplexities);  initComplexities(comboComplexities);
+
+  std::chrono::time_point<std::chrono::system_clock> startT, endT;
+  std::chrono::duration<double> elapsed_secondsT;
+  double durationT = 0;
 
   int z3_f_c=0;
   string inputFileName="", line="";
@@ -129,8 +129,6 @@ void driver(string list)
 
   cout<<"\n\n\nProcessing "<<data[0][0]["Name"]<<":";
   z3_f_c = 0;
-
-  string kernelComplexity = data[0][0]["Kernel Complexity"].as<string>();
 
   iegenlib::setCurrEnv();
   // Introduce the uninterpreted function symbols to environment, and 
@@ -203,6 +201,7 @@ void driver(string list)
     outRes<<"<<<<<<<<>>>>>>>> Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n\n";
 
     // Use different combinations of domain information 
+    bool foundUnSat = false;
     for(int rlc = 0 ; rlc < NRL ; rlc++ ){
 
       outRes<<"\n------ Utilizing propertes: "<<checkRuleStr[rlc]<<"\n\n";
@@ -210,13 +209,15 @@ void driver(string list)
       bool sat = true;
       int unSatFound=0, maySatFound=0;
       if(nUniqueRels == 0) sat = false;
-
       int dc=0;
+      startT = std::chrono::system_clock::now(); // Timing
       for( i=0; i < nUniqueRels; i++){  // Loop over all unique relations
 
         // if the dependence is unsat just using functional consistency, do not use index array property
-        if( dependences[i].unsat ) continue;   //.fs
-        dc++;
+        if( dependences[i].unsat ){
+          unSatFound++;
+          continue;   //.fs
+        }
 
         int uqa_c=1;
         std::set<std::string> UFSyms;
@@ -236,17 +237,27 @@ void driver(string list)
 //          setDependencesVal(dependences, i, rlc, false);
           maySatFound++;
         } else {
-          setDependencesVal(dependences, i, (rlc+1), true);
+          if(rlc==0) setDependencesVal(dependences, i, (rlc+1), true);
           unSatFound++;
         }
       }
+      endT = std::chrono::system_clock::now();
+      elapsed_secondsT = endT - startT;
+      durationT = elapsed_secondsT.count();
 
-      if( unSatFound == dc ){
+      if( unSatFound == nUniqueRels ){
         outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [StNo = "
-              <<stNo<<", Level = "<<parLL<<"] is Fully parallel!\n";
+              <<stNo<<", Level = "<<parLL<<"] is Fully parallel!  DURATION = "<<durationT<<"\n";
+        
+        if( !foundUnSat ) {
+          cout<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [Level = "
+              <<parLL<<", First St. = "<<stNo<<"] is Fully parallel!\n";
+        }
+        foundUnSat = true;
+
       } else {
         outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [StNo = "
-              <<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!\n";
+              <<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!  DURATION = "<<durationT<<"\n";
       }
     }
     outRes.close(); 
