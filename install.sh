@@ -45,7 +45,8 @@ cd chill
 mkdir build
 cd build
 cmake .. -DROSEHOME=$ROSEHOME -DBOOSTHOME=$BOOSTHOME -DIEGENHOME=$IEGENHOME
-make -j6  # Please change the 6 to number of threads you want make to utilize
+# Please change the 6 to number of threads you want make to utilize
+make -j6  
 cd ../..
 
 
@@ -57,7 +58,8 @@ git clean -fx src
 mkdir build
 cd build
 cmake -G "Unix Makefiles" ../
-make -j6  # Please change the 6 to number of threads you want make to utilize
+# Please change the 6 to number of threads you want make to utilize
+make -j6  
 cd ..
 
 
