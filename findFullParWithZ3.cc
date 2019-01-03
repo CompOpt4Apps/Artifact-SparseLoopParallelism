@@ -139,7 +139,7 @@ void driver(string list)
   // Read name of json files from input list
   ifstream inL(list);
 
-  cout<<"\n\n# Interpreting the summary output results by the driver:
+  cout<<"\n\n# Interpreting the summary output results by the driver:"
 "\nIn the results, each loop is recognized by \"its level\" and \"its first statement number\"." 
 "\nLoop levels start from 1 for outer most loop, and increase for inner loops."
 "\nStatements are numbered globally for all the statemets inside the loop nest starting from 1."
