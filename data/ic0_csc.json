@@ -1,7 +1,7 @@
 [
   [
     {
-      "Name" : "Incomplete Cholesky CSR",
+      "Name" : "Incomplete Cholesky CSC",
       "CHILL analysis info" : 
       [
         {
