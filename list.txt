@@ -5,4 +5,3 @@ data/gs_csr.json
 data/gs_bcsr.json
 data/ic0_csc.json
 data/staticleftChol_csc.json
-data/sgd_csr.json
