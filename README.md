@@ -293,6 +293,7 @@ Statements are numbered globally for all the statemets inside the loop nest star
 
 For example:
 
+```
 for(i=0; i<n;i++){   // [Level = 1, StNo = 1]
   for(j=0;j<n;j++){  // [Level = 2, StNo = 1]
     S1;
@@ -301,4 +302,5 @@ for(i=0; i<n;i++){   // [Level = 1, StNo = 1]
   for(j=0;j<n;j++){  // [Level = 2, StNo = 3]
     S3;
   }
-} 
+}
+```
