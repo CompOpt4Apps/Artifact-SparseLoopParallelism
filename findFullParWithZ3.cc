@@ -93,7 +93,7 @@ int main(int argc, char **argv)
   if (argc == 1)
   {
     cout<<"\n\nYou need to specify the input file. The input file should contain name of input JSON files:"
-          "\n./simplifyDriver list.txt\n\n";
+          "\n./findFullParWithZ3 list.txtt\n\n";
   } else if (argc >= 2){
     // Parsing command line arguments and reading given files.
     for(int arg = 1; arg < argc ; arg++){
@@ -127,7 +127,7 @@ void driver(string list)
   json data;
   in >> data;
 
-  cout<<"\n\n\nProcessing "<<data[0][0]["Name"]<<":";
+  cout<<"\n\n\n<<<<< Processing "<<data[0][0]["Name"]<<":";
   z3_f_c = 0;
 
   iegenlib::setCurrEnv();
@@ -196,9 +196,11 @@ void driver(string list)
 
     // Outfile for analysis result for a loop.
     string outFile;
-    outFile = (data[0][0]["Result"].as<string>())+"_"+int2str(stNo)+"_"+int2str(parLL)+".txt";
+    outFile = (data[0][0]["Result"].as<string>())+"_"+int2str(parLL)+"_"+int2str(stNo+1)+".txt";
     ofstream outRes(outFile.c_str(), std::ofstream::out);
-    outRes<<"<<<<<<<<>>>>>>>> Loop: [StNo = "<<stNo<<", Level = "<<parLL<<", nRels = "<<nRels<<"]\n\n";
+    outRes<<"<<<<<<<<>>>>>>>> Loop: [Level = "<<parLL<<", StNo = "<<stNo+1<<"], Number of Dependence Relations = "<<nRels<<"\n\n";
+
+    cout<<"\n\n<<< Processing Loop: [Level = "<<parLL<<", StNo = "<<stNo+1<<"], Number of Dependence Relations = "<<nRels;
 
     // Use different combinations of domain information 
     bool foundUnSat = false;
@@ -246,25 +248,31 @@ void driver(string list)
       durationT = elapsed_secondsT.count();
 
       if( unSatFound == nUniqueRels ){
-        outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [StNo = "
-              <<stNo<<", Level = "<<parLL<<"] is Fully parallel!  DURATION = "<<durationT<<"\n";
+        outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [Level = "<<parLL<<", StNo = "
+              <<stNo+1<<"] is Fully parallel!  DURATION = "<<durationT<<"\n";
         
         if( !foundUnSat ) {
-          cout<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [Level = "
-              <<parLL<<", First St. = "<<stNo<<"] is Fully parallel!\n";
+//          cout<<"\n\n>>>>>>>> Loop: [Level = "
+//              <<parLL<<", First St. = "<<stNo+1<<"] is Fully parallel! Based on "<<checkRuleStr[rlc]<<"\n";
+          cout<<"\n--- Loop is Fully parallel! Based on "<<checkRuleStr[rlc];
         }
         foundUnSat = true;
 
       } else {
-        outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [StNo = "
-              <<stNo<<", Level = "<<parLL<<"] is NOT Fully parallel!  DURATION = "<<durationT<<"\n";
+        outRes<<"\n\n>>>>>>>> Based on "<<checkRuleStr[rlc]<<" Loop: [Level = "<<parLL<<", StNo = "
+              <<stNo+1<<"] is NOT Fully parallel!  DURATION = "<<durationT<<"\n";
+        if( rlc == NRL-1 ) {
+//          cout<<"\n\n>>>>>>>> Loop: [Level = "<<parLL<<", First St. = "<<stNo+1<<"] is NOT Fully parallel!\n";
+          cout<<"\n--- Loop is Not Fully parallel!";
+        }
       }
     }
+    cout<<"\n>>> Processed Loop: [Level = "<<parLL<<", StNo = "<<stNo+1
+        <<"]. Detailed results were written to "<<outFile;
     outRes.close(); 
   }
 
-  cout<<"\n\n\nProcessed "<<data[0][0]["Name"]<<":   Results were written to "
-      <<(data[0][0]["Result"].as<string>()).c_str()<<"_StNo_LoopLevel.txt\n\n";
+  cout<<"\n\n>>>>> Processed "<<data[0][0]["Name"]<<"\n\n";
  } // End of input json file list loop
 
 }
