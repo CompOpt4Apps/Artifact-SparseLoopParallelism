@@ -14,6 +14,26 @@ g++ -O3 -o findFullParWithZ3 findFullParWithZ3.cc -I IEGenLib/src IEGenLib/build
 
 ./findFullParWithZ3 list.txt
 
+
+
+# Interpreting the summary output results by the driver:
+
+In the results, each loop is recognized by "its level" and "its first statement number". 
+Loop levels start from 1 for outer most loop, and increase for inner loops. 
+Statements are numbered globally for all the statemets inside the loop nest starting from 1. 
+
+For example:
+
+for(i=0; i<n;i++){   // [Level = 1, StNo = 1]
+  for(j=0;j<n;j++){  // [Level = 2, StNo = 1]
+    S1;
+  }
+  S2;
+  for(j=0;j<n;j++){  // [Level = 2, StNo = 3]
+    S3;
+  }
+} 
+
 */
 
 #include <iostream>
@@ -127,7 +147,7 @@ void driver(string list)
   json data;
   in >> data;
 
-  cout<<"\n\n\n<<<<< Processing "<<data[0][0]["Name"]<<":";
+  cout<<"\n\n\n<<<<< Processing "<<data[0][0]["Name"]<<" from "<<inputFileName<<":";
   z3_f_c = 0;
 
   iegenlib::setCurrEnv();
