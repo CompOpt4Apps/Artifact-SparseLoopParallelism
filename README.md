@@ -1,5 +1,8 @@
 # Artifact-SparseLoopParallelism
-This is the artifact for reproducing results in following paper titled "Extending Index-Array Properties for Data Dependence Analysis" presented in LCPC 2018.
+This is the artifact for reproducing results in the paper titled "Extending Index-Array Properties for Data Dependence Analysis" that was presented in LCPC 2018.
+
+**Rest of the README is focused on how to reproduce main results of the papaer presented in the section 4.2, Finding Loop Parallelism (Table 3).
+For reproducing time results in section 4.3, please refer to README in the timeResults directory.**
 
 
 The artifact uses CHiLL to do data dependence analysis, and IEGenLib to represent dependences, and index array properties, and converting them to Z3 problems. 
