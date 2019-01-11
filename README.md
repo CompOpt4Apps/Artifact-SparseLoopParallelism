@@ -1,5 +1,5 @@
 # Artifact-SparseLoopParallelism
-This is the artifact for producing results in following paper presented in LCPC 2018:
+This is the artifact for reproducing results in following paper titled "Extending Index-Array Properties for Data Dependence Analysis" presented in LCPC 2018.
 
 
 The artifact uses CHiLL to do data dependence analysis, and IEGenLib to represent dependences, and index array properties, and converting them to Z3 problems. 
@@ -11,7 +11,7 @@ After building the driver and its dependencies (see below) run the following:
 ```
 
 The output will be the results of determining which loops in each of the
-C kernels specified in the list.txt file are fully parallel.
+C kernels specified in the list.txt file are fully parallel. 
 
 Interpreting the summary output results by the driver:
 In the results, each loop is recognized by "its level" and "its first statement number". 
@@ -274,7 +274,7 @@ Following commands download and install latest version of Z3 SMT solver:
 `cd build`
 `cmake -G "Unix Makefiles" ../`
 `make -j6`  
-`cd ..`
+`cd ../..`
 
 
 ## Step 6: Building the artifact driver:
