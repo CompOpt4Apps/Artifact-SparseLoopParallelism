@@ -13,12 +13,15 @@ Run the code with (Inside same tesst directory):
 ```
 
 Please note: first line in matList.txt contains 3 numbers that are (in order): 
-             "MaxNumber of Threads" "Number of Iterations" "Number of Runs (for getting average run time)"
+
+              "MaxNumber of Threads" "Number of Iterations" "Number of Runs (for getting average run time)"
+
               Subsequent lines in matList.txt should contain list of input matrices. 
-              You need to download input matrices from:
+              You need to download input matrices from (you can search the matrix by name):
+
               https://sparse.tamu.edu/ 
+
               And put them inside data directory.
 
 After running the programs they print out detail time results that can be used to recreate figute 5. 
 However, they do not create the figure.
-
