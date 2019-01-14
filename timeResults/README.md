@@ -23,5 +23,5 @@ Please note: first line in matList.txt contains 3 numbers that are (in order):
 
               And put them inside data directory.
 
-After running the programs they print out detail time results that can be used to recreate figute 5. 
+After running the programs they print out detail time results that can be used to recreate Figure 5. 
 However, they do not create the figure.
